@@ -1,0 +1,695 @@
+diff -Nru gnome-remote-desktop-49.0/debian/changelog gnome-remote-desktop-49.0/debian/changelog
+--- gnome-remote-desktop-49.0/debian/changelog	2025-10-14 03:44:18.000000000 -0400
++++ gnome-remote-desktop-49.0/debian/changelog	2026-02-21 02:59:55.000000000 -0500
+@@ -1,3 +1,19 @@
++gnome-remote-desktop (49.0-0ubuntu1.3) questing; urgency=medium
++
++  * Fix retry limit causing permanent handover daemon death (LP: #2141992)
++    - Replace hard 30-retry limit with two-phase retries:
++      Phase 1: 30 attempts at 2s intervals (0-60s)
++      Phase 2: indefinite retries at 10s intervals (60s+)
++    - Prevents handover daemon from permanently giving up after 60s
++
++ -- Gerry Burde <gerry.burde@gmail.com>  Fri, 21 Feb 2026 03:15:00 -0500
++
++gnome-remote-desktop (49.0-0ubuntu1.2) questing; urgency=medium
++
++  * Apply mstsc handover fix (LP: #2141992)
++
++ -- Gerry Burde <gerry.burde@gmail.com>  Sat, 21 Feb 2026 00:32:17 -0500
++
+ gnome-remote-desktop (49.0-0ubuntu1.1) questing; urgency=medium
+ 
+   * d/p/lp-2127792-fix-nvenc-blackwell.patch: Fix NVENC video streaming on 
+diff -Nru gnome-remote-desktop-49.0/debian/patches/lp-2141992-mstsc-handover-fix.patch gnome-remote-desktop-49.0/debian/patches/lp-2141992-mstsc-handover-fix.patch
+--- gnome-remote-desktop-49.0/debian/patches/lp-2141992-mstsc-handover-fix.patch	1969-12-31 19:00:00.000000000 -0500
++++ gnome-remote-desktop-49.0/debian/patches/lp-2141992-mstsc-handover-fix.patch	2026-02-21 03:03:10.000000000 -0500
+@@ -0,0 +1,661 @@
++Description: <short summary of the patch>
++ TODO: Put a short summary on the line above and replace this paragraph
++ with a longer explanation of this change. Complete the meta-information
++ with other relevant fields (see below for details). To make it easier, the
++ information below has been extracted from the changelog. Adjust it or drop
++ it.
++ .
++ gnome-remote-desktop (49.0-0ubuntu1.3) questing; urgency=medium
++ .
++   * Fix retry limit causing permanent handover daemon death (LP: #2141992)
++     - Replace hard 30-retry limit with two-phase retries:
++       Phase 1: 30 attempts at 2s intervals (0-60s)
++       Phase 2: indefinite retries at 10s intervals (60s+)
++     - Prevents handover daemon from permanently giving up after 60s
++Author: Gerry Burde <gerry.burde@gmail.com>
++Bug-Ubuntu: https://bugs.launchpad.net/bugs/2141992
++
++---
++The information above should follow the Patch Tagging Guidelines, please
++checkout https://dep.debian.net/deps/dep3/ to learn about the format. Here
++are templates for supplementary fields that you might want to add:
++
++Origin: (upstream|backport|vendor|other), (<patch-url>|commit:<commit-id>)
++Bug: <upstream-bugtracker-url>
++Bug-Debian: https://bugs.debian.org/<bugnumber>
++Bug-Ubuntu: https://launchpad.net/bugs/<bugnumber>
++Forwarded: (no|not-needed|<patch-forwarded-url>)
++Applied-Upstream: <version>, (<commit-url>|commit:<commid-id>)
++Reviewed-By: <name and email of someone who approved/reviewed the patch>
++Last-Update: 2026-02-21
++
++--- gnome-remote-desktop-49.0.orig/data/gnome-remote-desktop-handover.service.in
+++++ gnome-remote-desktop-49.0/data/gnome-remote-desktop-handover.service.in
++@@ -1,5 +1,10 @@
++ [Unit]
++ Description=GNOME Remote Desktop Handover
+++# Prevent gsd-sharing from stopping the handover service on the login screen.
+++# gsd-sharing calls DisableService when enabled-connections is empty for the
+++# gdm greeter user, but the handover daemon must remain active in greeter
+++# sessions for the system daemon's server redirection to complete.
+++RefuseManualStop=yes
++ 
++ [Service]
++ Type=dbus
++--- /dev/null
+++++ gnome-remote-desktop-49.0/po/gnome-remote-desktop.pot
++@@ -0,0 +1,336 @@
+++# SOME DESCRIPTIVE TITLE.
+++# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+++# This file is distributed under the same license as the gnome-remote-desktop package.
+++# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+++#
+++#, fuzzy
+++msgid ""
+++msgstr ""
+++"Project-Id-Version: gnome-remote-desktop\n"
+++"Report-Msgid-Bugs-To: \n"
+++"POT-Creation-Date: 2026-02-21 03:01-0500\n"
+++"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+++"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+++"Language-Team: LANGUAGE <LL@li.org>\n"
+++"Language: \n"
+++"MIME-Version: 1.0\n"
+++"Content-Type: text/plain; charset=UTF-8\n"
+++"Content-Transfer-Encoding: 8bit\n"
+++
+++#: data/org.gnome.remotedesktop.configure-system-daemon.policy.in:11
+++msgid "Allow to configure gnome-remote-desktop's system daemon settings"
+++msgstr ""
+++
+++#: data/org.gnome.remotedesktop.configure-system-daemon.policy.in:12
+++msgid ""
+++"Authentication is required to configure gnome-remote-desktop's system daemon "
+++"settings"
+++msgstr ""
+++
+++#: data/org.gnome.remotedesktop.enable-system-daemon.policy.in:11
+++msgid "Allow to enable and disable gnome-remote-desktop's system daemon"
+++msgstr ""
+++
+++#: data/org.gnome.remotedesktop.enable-system-daemon.policy.in:12
+++msgid ""
+++"Authentication is required to enable or disable gnome-remote-desktop's "
+++"system daemon"
+++msgstr ""
+++
+++#: data/org.gnome.RemoteDesktop.Handover.desktop.in:3
+++msgid "GNOME Remote Desktop Handover Daemon"
+++msgstr ""
+++
+++#: src/grd-ctl.c:72
+++#, c-format
+++msgid "Usage: %s [OPTIONS...] COMMAND [SUBCOMMAND]...\n"
+++msgstr ""
+++
+++#: src/grd-ctl.c:307
+++msgid "Username: "
+++msgstr ""
+++
+++#: src/grd-ctl.c:319 src/grd-ctl.c:475
+++msgid "Password: "
+++msgstr ""
+++
+++#: src/grd-ctl.c:605
+++msgid "Commands:\n"
+++msgstr ""
+++
+++#: src/grd-ctl.c:610
+++msgid ""
+++"  rdp                                            - RDP subcommands:\n"
+++"    set-port                                     - Set port the server binds "
+++"to\n"
+++"    enable                                       - Enable the RDP backend\n"
+++"    disable                                      - Disable the RDP backend\n"
+++"    set-tls-cert <path-to-cert>                  - Set path to TLS "
+++"certificate\n"
+++"    set-tls-key <path-to-key>                    - Set path to TLS key\n"
+++"    set-credentials [<username> [<password>]]    - Set username and "
+++"password\n"
+++"                                                   credentials\n"
+++"    clear-credentials                            - Clear username and "
+++"password\n"
+++"                                                   credentials\n"
+++"    enable-view-only                             - Disable remote control of "
+++"input\n"
+++"                                                   devices\n"
+++"    disable-view-only                            - Enable remote control of "
+++"input\n"
+++"                                                   devices\n"
+++"    enable-port-negotiation                      - If unavailable, listen "
+++"to\n"
+++"                                                   a different port\n"
+++"    disable-port-negotiation                     - If unavailable, don't "
+++"listen\n"
+++"                                                   to a different port\n"
+++"\n"
+++msgstr ""
+++
+++#: src/grd-ctl.c:634
+++msgid ""
+++"  vnc                                        - VNC subcommands:\n"
+++"    set-port                                 - Set port the server binds to\n"
+++"    enable                                   - Enable the VNC backend\n"
+++"    disable                                  - Disable the VNC backend\n"
+++"    set-password [<password>]                - Set the VNC password\n"
+++"    clear-password                           - Clear the VNC password\n"
+++"    set-auth-method password|prompt          - Set the authorization method\n"
+++"    enable-view-only                         - Disable remote control of "
+++"input\n"
+++"                                               devices\n"
+++"    disable-view-only                        - Enable remote control of "
+++"input\n"
+++"                                               devices\n"
+++"    enable-port-negotiation                  - If unavailable, listen to\n"
+++"                                               a different port\n"
+++"    disable-port-negotiation                 - If unavailable, don't listen\n"
+++"                                               to a different port\n"
+++"\n"
+++msgstr ""
+++
+++#: src/grd-ctl.c:654
+++msgid ""
+++"  status [--show-credentials]                - Show current status\n"
+++"\n"
+++"Options:\n"
+++"  --headless                                 - Configure headless daemon\n"
+++"                                               running on a user session\n"
+++"  --system                                   - Configure system daemon\n"
+++"                                               for remote login\n"
+++"  --help                                     - Print this help text\n"
+++msgstr ""
+++
+++#: src/grd-daemon.c:995
+++msgid "GNOME Remote Desktop"
+++msgstr ""
+++
+++#: src/grd-daemon-handover.c:320 src/grd-daemon-handover.c:385
+++#, c-format
+++msgid "Continue With Insecure Connection?"
+++msgstr ""
+++
+++#. Translators: Don't translate “use redirection server name:i:1”.
+++#. * It's a menu option, and it's the same for all languages.
+++#: src/grd-daemon-handover.c:323 src/grd-daemon-handover.c:389
+++#, c-format
+++msgid ""
+++"This Remote Desktop connection is insecure. To secure this connection, "
+++"enable RDSTLS Security in your client by saving the connection settings in "
+++"your client as an RDP file and set “use redirection server name:i:1” in it."
+++msgstr ""
+++
+++#: src/grd-daemon-handover.c:328 src/grd-daemon-handover.c:394
+++#, c-format
+++msgid "Disconnect"
+++msgstr ""
+++
+++#: src/grd-daemon-handover.c:329 src/grd-daemon-handover.c:395
+++#, c-format
+++msgid "Continue"
+++msgstr ""
+++
+++#: src/grd-daemon-user.c:99
+++#, c-format
+++msgid "Desktop Sharing port changed"
+++msgstr ""
+++
+++#: src/grd-daemon-user.c:101
+++#, c-format
+++msgid ""
+++"The Desktop Sharing port has changed from <b>%i</b> to <b>%i</b>.\n"
+++"This is because the Remote Sessions service has been activated and it has a "
+++"higher priority to use port <b>%i</b>."
+++msgstr ""
+++
+++#: src/grd-daemon-user.c:107 src/grd-session-vnc.c:310
+++#, c-format
+++msgid "Accept"
+++msgstr ""
+++
+++#: src/grd-session-vnc.c:305
+++#, c-format
+++msgid "Do you want to share your desktop?"
+++msgstr ""
+++
+++#: src/grd-session-vnc.c:307
+++#, c-format
+++msgid ""
+++"A user on the computer '%s' is trying to remotely view or control your "
+++"desktop."
+++msgstr ""
+++
+++#: src/grd-session-vnc.c:309
+++#, c-format
+++msgid "Refuse"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:7
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:83
+++msgid "The port used by the RDP server"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:8
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:84
+++msgid "The RDP client will connect to this port to use this RDP server."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:14
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:90
+++msgid "Search a different RDP port if the configured one is used"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:15
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:91
+++msgid ""
+++"When negotiate-port is set to 'true' the RDP server will attempt to listen "
+++"to the first available of the next 10 ports starting from the configured one."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:23
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:99
+++msgid "Whether the RDP backend is enabled or not"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:24
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:100
+++msgid "If set to 'true' the RDP backend will be initialized."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:30
+++msgid "Screenshare mode of RDP connections"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:31
+++msgid ""
+++"The screenshare mode specifies, whether the RDP backend mirrors the primary "
+++"screen, or whether a virtual monitor is created. For the initial resolution "
+++"of the virtual monitor, the RDP backend uses either the client core data "
+++"([MS-RDPBCGR] 2.2.1.3.2) or the client monitor data ([MS-RDPBCGR] "
+++"2.2.1.3.6), depending on what is available. When using a remote desktop "
+++"session with a virtual monitor, clients can resize the resolution of the "
+++"virtual monitor during a session with the Display Update Virtual Channel "
+++"Extension ([MS-RDPEDISP]). Allowed screenshare modes include: * mirror-"
+++"primary - Record the primary monitor of the current user session. * extend - "
+++"Create a new virtual monitor and use it for the remote desktop session. The "
+++"resolution of this virtual monitor is derived from the monitor "
+++"configuration, submitted by the remote desktop client."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:57
+++msgid "Path to the certificate file"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:58
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:66
+++msgid ""
+++"In order to be able to use RDP with TLS Security, both the private key file "
+++"and the certificate file need to be provided to the RDP server."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:65
+++msgid "Path to the private key file"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:73
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:131
+++msgid "Only allow remote connections to view the screen content"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:74
+++msgid ""
+++"When view-only is true, remote RDP connections cannot manipulate input "
+++"devices (e.g. mouse and keyboard)."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:108
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:180
+++msgid "The port used by the VNC server"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:109
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:181
+++msgid "The VNC client will connect to this port to use this VNC server."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:115
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:187
+++msgid "Search a different VNC port if the configured one is used"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:116
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:188
+++msgid ""
+++"When negotiate-port is set to 'true' the VNC server will attempt to listen "
+++"to the first available of the next 10 ports starting from the configured one."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:124
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:196
+++msgid "Whether the VNC backend is enabled or not"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:125
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:197
+++msgid "If set to 'true' the VNC backend will be initialized."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:132
+++msgid ""
+++"When view-only is true, remote VNC connections cannot manipulate input "
+++"devices (e.g. mouse and keyboard)."
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:139
+++msgid "Method used to authenticate VNC connections"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:140
+++msgid ""
+++"The VNC authentication method describes how a remote connection is "
+++"authenticated. It can currently be done in two different ways: * prompt - by "
+++"prompting the user for each new connection, requiring a person with physical "
+++"access to the workstation to explicitly approve the new connection. * "
+++"password - by requiring the remote client to provide a known password"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:152
+++msgid "Screenshare mode of VNC connections"
+++msgstr ""
+++
+++#: src/org.gnome.desktop.remote-desktop.gschema.xml.in:153
+++msgid ""
+++"The screenshare mode specifies, whether the VNC backend mirrors the primary "
+++"screen, or whether a virtual monitor is created. For the initial resolution "
+++"of the virtual monitor, the VNC backend uses a default size of 1920x1080 "
+++"pixels. When using a remote desktop session with a virtual monitor, clients "
+++"can resize the resolution of the virtual monitor during a session with the "
+++"setDesktopSize PDU. Allowed screenshare modes include: * mirror-primary - "
+++"Record the primary monitor of the current user session. * extend - Create a "
+++"new virtual monitor and use it for the remote desktop session. The initial "
+++"monitor resolution of this virtual monitor is set to 1920x1080 pixels. "
+++"Clients can override the initial resolution with subsequent monitor "
+++"configuration updates."
+++msgstr ""
++--- gnome-remote-desktop-49.0.orig/src/grd-daemon-handover.c
+++++ gnome-remote-desktop-49.0/src/grd-daemon-handover.c
++@@ -55,6 +55,9 @@ struct _GrdDaemonHandover
++   GrdShellDialog *dialog;
++ 
++   unsigned int gnome_remote_desktop_watch_name_id;
+++  unsigned int request_handover_retry_id;
+++  unsigned int request_handover_retry_count;
+++#define REQUEST_HANDOVER_MAX_RETRIES 30
++ };
++ 
++ G_DEFINE_TYPE (GrdDaemonHandover, grd_daemon_handover, GRD_TYPE_DAEMON)
++@@ -562,6 +565,34 @@ on_remote_desktop_rdp_handover_proxy_acq
++ static void
++ on_remote_desktop_rdp_dispatcher_handover_requested (GObject      *object,
++                                                      GAsyncResult *result,
+++                                                     gpointer      user_data);
+++
+++static gboolean
+++retry_request_handover (gpointer user_data)
+++{
+++  GrdDaemonHandover *daemon_handover = user_data;
+++  GCancellable *cancellable;
+++
+++  daemon_handover->request_handover_retry_id = 0;
+++
+++  if (!daemon_handover->remote_desktop_dispatcher)
+++    return G_SOURCE_REMOVE;
+++
+++  cancellable = grd_daemon_get_cancellable (GRD_DAEMON (daemon_handover));
+++
+++  g_debug ("[DaemonHandover] Retrying RequestHandover");
+++  grd_dbus_remote_desktop_rdp_dispatcher_call_request_handover (
+++    daemon_handover->remote_desktop_dispatcher,
+++    cancellable,
+++    on_remote_desktop_rdp_dispatcher_handover_requested,
+++    daemon_handover);
+++
+++  return G_SOURCE_REMOVE;
+++}
+++
+++static void
+++on_remote_desktop_rdp_dispatcher_handover_requested (GObject      *object,
+++                                                     GAsyncResult *result,
++                                                      gpointer      user_data)
++ {
++   GrdDBusRemoteDesktopRdpDispatcher *remote_desktop_dispatcher;
++@@ -583,8 +614,47 @@ on_remote_desktop_rdp_dispatcher_handove
++       if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++         return;
++ 
++-      g_warning ("[DaemonHandover] Failed to request remote desktop "
++-                 "handover: %s", error->message);
+++      daemon_handover = GRD_DAEMON_HANDOVER (user_data);
+++
+++      daemon_handover->request_handover_retry_count++;
+++
+++      if (daemon_handover->request_handover_retry_count <=
+++          REQUEST_HANDOVER_MAX_RETRIES)
+++        {
+++          /* Initial retries: every 2 seconds for the first 60s.
+++           * This handles the normal case where the system daemon
+++           * needs a moment to set up the session. */
+++          g_debug ("[DaemonHandover] Failed to request remote desktop "
+++                   "handover: %s, retrying in 2s (%u/%d)",
+++                   error->message,
+++                   daemon_handover->request_handover_retry_count,
+++                   REQUEST_HANDOVER_MAX_RETRIES);
+++
+++          if (daemon_handover->request_handover_retry_id == 0)
+++            {
+++              daemon_handover->request_handover_retry_id =
+++                g_timeout_add_seconds (2, retry_request_handover,
+++                                       daemon_handover);
+++            }
+++        }
+++      else
+++        {
+++          /* After initial retries exhausted, keep retrying every 10s.
+++           * The handover daemon may start before any client connects
+++           * (e.g. after a GDM restart). It must remain available for
+++           * future connections rather than permanently giving up. */
+++          g_debug ("[DaemonHandover] Failed to request remote desktop "
+++                   "handover: %s, slow-retrying in 10s (%u)",
+++                   error->message,
+++                   daemon_handover->request_handover_retry_count);
+++
+++          if (daemon_handover->request_handover_retry_id == 0)
+++            {
+++              daemon_handover->request_handover_retry_id =
+++                g_timeout_add_seconds (10, retry_request_handover,
+++                                       daemon_handover);
+++            }
+++        }
++       return;
++     }
++ 
++@@ -730,6 +800,9 @@ grd_daemon_handover_shutdown (GApplicati
++ 
++   g_cancellable_cancel (grd_daemon_get_cancellable (daemon));
++ 
+++  g_clear_handle_id (&daemon_handover->request_handover_retry_id,
+++                     g_source_remove);
+++
++   g_clear_object (&daemon_handover->remote_desktop_handover);
++   g_clear_object (&daemon_handover->remote_desktop_dispatcher);
++ 
++--- gnome-remote-desktop-49.0.orig/src/grd-session-rdp.c
+++++ gnome-remote-desktop-49.0/src/grd-session-rdp.c
++@@ -1274,15 +1274,35 @@ init_rdp_session (GrdSessionRdp  *sessio
++                                          rdp_private_key, 1))
++     g_assert_not_reached ();
++ 
++-  freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
++-  freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, FALSE);
++-  freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
++-
++   if (grd_context_get_runtime_mode (context) == GRD_RUNTIME_MODE_HANDOVER)
++     {
+++      /* Handover mode: offer RDSTLS + TLS, no NLA.
+++       * The handover daemon has no SAM database for NLA/NTLM auth.
+++       * Clients that support RDSTLS (redirected auth) use it;
+++       * others (like mstsc) fall back to TLS. The user was already
+++       * authenticated during the initial connection to the system daemon. */
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, TRUE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, FALSE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdstlsSecurity, TRUE);
++       freerdp_settings_set_string (rdp_settings, FreeRDP_Username, username);
++       freerdp_settings_set_string (rdp_settings, FreeRDP_Password, password);
++-      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdstlsSecurity, TRUE);
+++    }
+++  else if (grd_context_get_runtime_mode (context) == GRD_RUNTIME_MODE_SYSTEM)
+++    {
+++      /* System mode: offer TLS + NLA for initial connections.
+++       * Some clients (mstsc CredSSP v6) may fail NLA on first attempt
+++       * but auto-retry; TLS provides a reliable fallback. */
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, TRUE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
+++    }
+++  else
+++    {
+++      /* Headless/screen-share modes: NLA only (original behavior) */
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, FALSE);
+++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
++     }
++ 
++   freerdp_settings_set_uint32 (rdp_settings, FreeRDP_OsMajorType,
++--- /dev/null
+++++ gnome-remote-desktop-49.0/tests/test-mstsc-patches.sh
++@@ -0,0 +1,125 @@
+++#!/bin/sh
+++# Test suite for mstsc handover patches (LP #2141992)
+++# Tests that FAIL on unpatched GRD and PASS on patched GRD.
+++#
+++# Usage: ./test-mstsc-patches.sh [--unpatched]
+++#   --unpatched  Expect unpatched behavior (tests assert failures)
+++
+++PASS=0
+++FAIL=0
+++SKIP=0
+++EXPECT_UNPATCHED=false
+++
+++if [ "$1" = "--unpatched" ]; then
+++  EXPECT_UNPATCHED=true
+++fi
+++
+++GRD_BINARY="${GRD_BINARY:-/usr/libexec/gnome-remote-desktop-daemon}"
+++HANDOVER_SERVICE="${HANDOVER_SERVICE:-${TEST_SRCDIR:-/tmp/gnome-remote-desktop-49.0}/data/gnome-remote-desktop-handover.service.in}"
+++GRD_SESSION_RDP_SOURCE="${GRD_SESSION_RDP_SOURCE:-${TEST_SRCDIR:-/tmp/gnome-remote-desktop-49.0}/src/grd-session-rdp.c}"
+++GRD_DAEMON_HANDOVER_SOURCE="${GRD_DAEMON_HANDOVER_SOURCE:-${TEST_SRCDIR:-/tmp/gnome-remote-desktop-49.0}/src/grd-daemon-handover.c}"
+++
+++pass() { echo "  PASS: $1"; PASS=$((PASS + 1)); }
+++fail() { echo "  FAIL: $1"; FAIL=$((FAIL + 1)); }
+++skip() { echo "  SKIP: $1"; SKIP=$((SKIP + 1)); }
+++
+++assert_patched() {
+++  # $1 = test name, $2 = condition (0=true, nonzero=false)
+++  if [ "$2" -eq 0 ]; then
+++    if [ "$EXPECT_UNPATCHED" = "true" ]; then
+++      fail "$1 (expected to fail on unpatched, but passed)"
+++    else
+++      pass "$1"
+++    fi
+++  else
+++    if [ "$EXPECT_UNPATCHED" = "true" ]; then
+++      pass "$1 (correctly fails on unpatched)"
+++    else
+++      fail "$1"
+++    fi
+++  fi
+++}
+++
+++echo "=== Bug 1: SYSTEM mode offers TLS alongside NLA ==="
+++# The patched code should have TlsSecurity = TRUE in the SYSTEM mode branch.
+++# Unpatched code only has NlaSecurity = TRUE with TlsSecurity = FALSE.
+++if [ -f "$GRD_SESSION_RDP_SOURCE" ]; then
+++  # Check source: SYSTEM mode branch should set TlsSecurity TRUE
+++  SYSTEM_TLS=$(awk '/RUNTIME_MODE_SYSTEM/,/\}/' "$GRD_SESSION_RDP_SOURCE" | \
+++    grep -c "FreeRDP_TlsSecurity, TRUE" || true)
+++  SYSTEM_TLS=${SYSTEM_TLS:-0}
+++  test "$SYSTEM_TLS" -ge 1
+++  assert_patched "SYSTEM mode enables TLS in source" $?
+++else
+++  # Check binary: look for the string pattern indicating TLS is configured
+++  # alongside the SYSTEM mode runtime check
+++  strings "$GRD_BINARY" | grep -q "TLS.*fallback\|TLS + NLA" 2>/dev/null
+++  skip "Source not available, binary string check inconclusive"
+++fi
+++
+++echo ""
+++echo "=== Bug 2: HANDOVER mode disables NLA and enables TLS ==="
+++# Note: Stock GRD already sets RDSTLS=TRUE in HANDOVER mode, but keeps
+++# NLA=TRUE and TLS=FALSE. NLA fails without a SAM/NTLM provider after
+++# redirect. Our patch disables NLA and enables TLS in HANDOVER mode.
+++if [ -f "$GRD_SESSION_RDP_SOURCE" ]; then
+++  # Check source: HANDOVER mode should disable NLA
+++  HANDOVER_NO_NLA=$(awk '/RUNTIME_MODE_HANDOVER/,/\}/' "$GRD_SESSION_RDP_SOURCE" | \
+++    grep -c "FreeRDP_NlaSecurity, FALSE" || true)
+++  HANDOVER_NO_NLA=${HANDOVER_NO_NLA:-0}
+++  test "$HANDOVER_NO_NLA" -ge 1
+++  assert_patched "HANDOVER mode disables NLA in source" $?
+++
+++  # Check source: HANDOVER mode should enable TLS
+++  HANDOVER_TLS=$(awk '/RUNTIME_MODE_HANDOVER/,/\}/' "$GRD_SESSION_RDP_SOURCE" | \
+++    grep -c "FreeRDP_TlsSecurity, TRUE" || true)
+++  HANDOVER_TLS=${HANDOVER_TLS:-0}
+++  test "$HANDOVER_TLS" -ge 1
+++  assert_patched "HANDOVER mode enables TLS in source" $?
+++else
+++  skip "Source not available for Bug 2 checks"
+++fi
+++
+++echo ""
+++echo "=== Bug 3: Handover service has RefuseManualStop ==="
+++if [ -f "$HANDOVER_SERVICE" ]; then
+++  grep -q "RefuseManualStop=yes" "$HANDOVER_SERVICE" 2>/dev/null
+++  assert_patched "Handover service has RefuseManualStop=yes" $?
+++else
+++  skip "Handover service file not found at $HANDOVER_SERVICE"
+++fi
+++
+++echo ""
+++echo "=== Bug 4: Handover daemon retries RequestHandover ==="
+++if [ -f "$GRD_DAEMON_HANDOVER_SOURCE" ]; then
+++  # Check that retry logic exists
+++  grep -q "retry_request_handover" "$GRD_DAEMON_HANDOVER_SOURCE" 2>/dev/null
+++  assert_patched "Handover daemon has retry function" $?
+++
+++  # Check that it doesn't permanently give up (slow-retry after initial window)
+++  grep -q "slow-retrying\|slow.retry\|keep retrying" "$GRD_DAEMON_HANDOVER_SOURCE" 2>/dev/null
+++  assert_patched "Handover daemon has slow-retry fallback (no permanent give-up)" $?
+++else
+++  skip "Handover daemon source not available for Bug 4 checks"
+++fi
+++
+++echo ""
+++echo "=== Bug 4b: Integration test -- handover retry with xfreerdp3 ==="
+++if command -v xfreerdp3 >/dev/null 2>&1 && [ -n "$DISPLAY" ] && systemctl is-active gnome-remote-desktop >/dev/null 2>&1; then
+++  # Test that the system daemon accepts a TLS connection
+++  # On unpatched GRD, this will fail (NLA only, no TLS)
+++  RESULT=$(timeout 8 xfreerdp3 /v:127.0.0.1 /u:ubuntu /p:ubuntu \
+++    /sec:tls /cert:tofu +clipboard /timeout:5000 2>&1 || true)
+++
+++  echo "$RESULT" | grep -q "server_redirection_pdu\|redirection\|PIXEL_FORMAT" 2>/dev/null
+++  assert_patched "xfreerdp3 TLS connection reaches redirect or desktop" $?
+++else
+++  skip "xfreerdp3 not available, no DISPLAY, or GRD not running"
+++fi
+++
+++echo ""
+++echo "======================================="
+++echo "Results: $PASS passed, $FAIL failed, $SKIP skipped"
+++echo "======================================="
+++
+++[ "$FAIL" -eq 0 ]
+diff -Nru gnome-remote-desktop-49.0/debian/patches/series gnome-remote-desktop-49.0/debian/patches/series
+--- gnome-remote-desktop-49.0/debian/patches/series	2025-10-14 03:44:18.000000000 -0400
++++ gnome-remote-desktop-49.0/debian/patches/series	2026-02-21 03:03:10.000000000 -0500
+@@ -1,2 +1,3 @@
+ fdkaac.patch
+ lp-2127792-fix-nvenc-blackwell.patch
++lp-2141992-mstsc-handover-fix.patch

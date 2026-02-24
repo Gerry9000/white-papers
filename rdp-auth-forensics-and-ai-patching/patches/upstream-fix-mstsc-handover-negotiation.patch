@@ -1,0 +1,177 @@
+From: Claude Code <noreply@anthropic.com>
+Subject: rdp: Fix security negotiation for mstsc handover connections
+
+Three issues prevent Windows mstsc.exe from completing an RDP session
+to GRD when using system mode with server redirection:
+
+1. Security negotiation is NLA-only for all runtime modes. In SYSTEM
+   mode, mstsc's CredSSP v6 pubKeyAuth binding sometimes fails on
+   first attempt. Adding TLS as a fallback (matching Windows RDS
+   "Negotiate" behavior) provides a reliable path. In HANDOVER mode,
+   NLA is offered but the handover daemon has no SAM database for
+   NTLM validation. Since mstsc does not request RDSTLS, negotiation
+   selects NLA which fails with SEC_E_NO_CREDENTIALS.
+
+   Fix: set security protocols per runtime mode. HANDOVER gets
+   RDSTLS + TLS (no NLA). SYSTEM gets TLS + NLA. Headless and
+   screen-share modes keep NLA-only (original behavior).
+
+2. The user-session handover daemon calls RequestHandover once on
+   startup. If no client connection is pending yet (e.g. the user
+   just logged in via GDM and the redirected client hasn't
+   reconnected), the call fails and the daemon never retries.
+
+   Fix: on RequestHandover failure, schedule a 2-second retry up to
+   30 attempts (60 seconds). This covers the window between the user
+   logging in and the redirected client arriving.
+
+Note: A separate issue exists where gnome-settings-daemon's sharing
+plugin (gsd-sharing) stops the handover service in GDM greeter
+sessions because the greeter user has no enabled-connections in
+gsettings. This should be addressed in gsd-sharing by checking
+whether the system RDP daemon is active before stopping the handover
+service. As a workaround, deployments can add a systemd drop-in:
+
+  ~/.config/systemd/user/gnome-remote-desktop-handover.service.d/override.conf
+  [Unit]
+  RefuseManualStop=yes
+
+Closes: https://gitlab.gnome.org/GNOME/gnome-remote-desktop/-/issues/244
+---
+ src/grd-session-rdp.c      | 31 +++++++++++++++++++++-----
+ src/grd-daemon-handover.c  | 55 +++++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 78 insertions(+), 8 deletions(-)
+
+--- a/src/grd-session-rdp.c
++++ b/src/grd-session-rdp.c
+@@ -1274,15 +1274,35 @@
+                                          rdp_private_key, 1))
+     g_assert_not_reached ();
+
+-  freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
+-  freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, FALSE);
+-  freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
+-
+   if (grd_context_get_runtime_mode (context) == GRD_RUNTIME_MODE_HANDOVER)
+     {
++      /* Handover mode: offer RDSTLS + TLS, no NLA.
++       * The handover daemon has no SAM database for NLA/NTLM auth.
++       * Clients that support RDSTLS (redirected auth) use it;
++       * others (like mstsc) fall back to TLS. The user was already
++       * authenticated during the initial connection to the system daemon. */
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, TRUE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, FALSE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdstlsSecurity, TRUE);
+       freerdp_settings_set_string (rdp_settings, FreeRDP_Username, username);
+       freerdp_settings_set_string (rdp_settings, FreeRDP_Password, password);
+-      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdstlsSecurity, TRUE);
++    }
++  else if (grd_context_get_runtime_mode (context) == GRD_RUNTIME_MODE_SYSTEM)
++    {
++      /* System mode: offer TLS + NLA for initial connections.
++       * Some clients (mstsc CredSSP v6) may fail NLA on first attempt
++       * but auto-retry; TLS provides a reliable fallback. */
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, TRUE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
++    }
++  else
++    {
++      /* Headless/screen-share modes: NLA only (original behavior) */
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_RdpSecurity, FALSE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_TlsSecurity, FALSE);
++      freerdp_settings_set_bool (rdp_settings, FreeRDP_NlaSecurity, TRUE);
+     }
+
+   freerdp_settings_set_uint32 (rdp_settings, FreeRDP_OsMajorType,
+--- a/src/grd-daemon-handover.c
++++ b/src/grd-daemon-handover.c
+@@ -55,6 +55,9 @@
+   GrdShellDialog *dialog;
+
+   unsigned int gnome_remote_desktop_watch_name_id;
++  unsigned int request_handover_retry_id;
++  unsigned int request_handover_retry_count;
++#define REQUEST_HANDOVER_MAX_RETRIES 30
+ };
+
+ G_DEFINE_TYPE (GrdDaemonHandover, grd_daemon_handover, GRD_TYPE_DAEMON)
+@@ -562,6 +565,34 @@
+ static void
+ on_remote_desktop_rdp_dispatcher_handover_requested (GObject      *object,
+                                                      GAsyncResult *result,
++                                                     gpointer      user_data);
++
++static gboolean
++retry_request_handover (gpointer user_data)
++{
++  GrdDaemonHandover *daemon_handover = user_data;
++  GCancellable *cancellable;
++
++  daemon_handover->request_handover_retry_id = 0;
++
++  if (!daemon_handover->remote_desktop_dispatcher)
++    return G_SOURCE_REMOVE;
++
++  cancellable = grd_daemon_get_cancellable (GRD_DAEMON (daemon_handover));
++
++  g_debug ("[DaemonHandover] Retrying RequestHandover");
++  grd_dbus_remote_desktop_rdp_dispatcher_call_request_handover (
++    daemon_handover->remote_desktop_dispatcher,
++    cancellable,
++    on_remote_desktop_rdp_dispatcher_handover_requested,
++    daemon_handover);
++
++  return G_SOURCE_REMOVE;
++}
++
++static void
++on_remote_desktop_rdp_dispatcher_handover_requested (GObject      *object,
++                                                     GAsyncResult *result,
+                                                      gpointer      user_data)
+ {
+   GrdDBusRemoteDesktopRdpDispatcher *remote_desktop_dispatcher;
+@@ -583,8 +614,30 @@
+       if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+         return;
+
+-      g_warning ("[DaemonHandover] Failed to request remote desktop "
+-                 "handover: %s", error->message);
++      daemon_handover = GRD_DAEMON_HANDOVER (user_data);
++
++      if (daemon_handover->request_handover_retry_count >=
++          REQUEST_HANDOVER_MAX_RETRIES)
++        {
++          g_warning ("[DaemonHandover] Failed to request remote desktop "
++                     "handover after %u retries, giving up: %s",
++                     daemon_handover->request_handover_retry_count,
++                     error->message);
++          return;
++        }
++
++      daemon_handover->request_handover_retry_count++;
++      g_debug ("[DaemonHandover] Failed to request remote desktop "
++               "handover: %s, retrying in 2s (%u/%d)",
++               error->message,
++               daemon_handover->request_handover_retry_count,
++               REQUEST_HANDOVER_MAX_RETRIES);
++
++      if (daemon_handover->request_handover_retry_id == 0)
++        {
++          daemon_handover->request_handover_retry_id =
++            g_timeout_add_seconds (2, retry_request_handover, daemon_handover);
++        }
+       return;
+     }
+
+@@ -730,6 +783,9 @@
+
+   g_cancellable_cancel (grd_daemon_get_cancellable (daemon));
+
++  g_clear_handle_id (&daemon_handover->request_handover_retry_id,
++                     g_source_remove);
++
+   g_clear_object (&daemon_handover->remote_desktop_handover);
+   g_clear_object (&daemon_handover->remote_desktop_dispatcher);
+
