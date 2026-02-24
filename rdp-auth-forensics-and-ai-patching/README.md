@@ -38,4 +38,4 @@ Phase 1 patches are included for reference -- the paper documents the progressio
 - PPA: `ppa:gerry9000/grd-mstsc-fix`
 
 ### Companion Training Module
-A step-by-step training module covering the AI-assisted investigation process, verification techniques, and hallucination patterns is available at [`training-devsecops-ai-agents/modules/09-rdp-protocol-forensics/`](https://github.com/Gerry9000/training-devsecops-ai-agents/tree/main/modules/09-rdp-protocol-forensics).
+A step-by-step training module covering the AI-assisted investigation process, verification techniques, and hallucination patterns is available at [`training-devsecops-ai-agents/modules/10-rdp-protocol-forensics/`](https://github.com/Gerry9000/training-devsecops-ai-agents/tree/main/modules/10-rdp-protocol-forensics).
