@@ -2,7 +2,7 @@
 
 **Author**: Gerry Burde
 **Date**: February 2026
-**Version**: 1.0
+**Version**: 1.0.1
 
 ---
 
@@ -40,6 +40,24 @@ GRD operates in four runtime modes, each activated by a command-line flag:
 | HANDOVER | `--handover` | Post-redirect session daemon in the user's login session |
 
 The **system-to-handover flow** is critical for headless VMs:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as mstsc.exe (Client)
+    participant System as GRD System Daemon (:3389)
+    participant GDM as GDM Greeter (Login)
+    participant Handover as GRD Handover Daemon
+
+    Client->>System: Connect & Negotiate NLA
+    System->>GDM: Present Login Screen
+    GDM-->>System: User Authenticates
+    System->>Handover: Start Handover Service (systemd)
+    Handover->>System: D-Bus RequestHandover()
+    System-->>Client: RDP Server Redirect
+    Client->>Handover: Reconnect & Negotiate RDSTLS
+    Handover-->>Client: Session Established
+```
 
 1. The **system daemon** listens on port 3389 and presents the GDM login screen
 2. After the user authenticates at GDM, the system daemon issues an **RDP server redirect** to the user session's handover daemon
@@ -200,6 +218,30 @@ The initial analysis added retry logic to the handover daemon's `RequestHandover
 ### 5.3 The Actual Failure Mode
 
 With the retry logic removed, the failure mode is simpler than initially theorized:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as mstsc.exe
+    participant System as GRD System Daemon
+    participant Handover as GRD Handover Daemon
+    participant systemd as systemd (user)
+    participant GSD as gsd-sharing (Settings Daemon)
+
+    System->>Handover: Start Handover Service
+    Handover->>System: D-Bus RequestHandover() (Succeeds)
+    System-->>Client: RDP Server Redirect
+
+    rect rgb(255, 200, 200)
+    Note over Handover, GSD: THE VULNERABILITY WINDOW (~2 seconds)
+    GSD->>GSD: Check greeter gsettings (No connections)
+    GSD->>systemd: StopUnit("gnome-remote-desktop-handover.service")
+    systemd->>Handover: SIGTERM
+    Handover--xHandover: KILLED
+    end
+
+    Client-xHandover: Reconnect Attempt (Fails - Black Screen)
+```
 
 1. The handover daemon starts and calls `RequestHandover` -- this succeeds immediately
 2. Approximately 2 seconds later, gsd-sharing kills the daemon (Bug 1)
